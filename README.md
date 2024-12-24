@@ -28,7 +28,7 @@ The user is solely responsible for complying with the terms of service of the we
 
 ## Limitations
 - Some websites may throttle or block automated downloads if abused, use responsibly.
-- Chrome downloads but I recommend using Firefox.
+- Chrome downloads(does not save in a made folder), I recommend using Firefox.
 
 ## Contributing
 Contributions are welcome! Feel free to submit issues or pull requests on the GitHub repository.
