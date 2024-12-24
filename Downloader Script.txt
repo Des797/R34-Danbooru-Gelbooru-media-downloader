@@ -1,9 +1,9 @@
 // ==UserScript==
-// @name         Multi-Site Media Downloader (Complete Only Alert)
+// @name         Multi-Site Media Downloader
 // @namespace    http://tampermonkey.net/
-// @version      3.9
+// @version      1.0
 // @description  Download images and videos from tags on Rule34 and Danbooru with alert only after all downloads are complete
-// @author       You
+// @author       shadybrady
 // @match        https://rule34.xxx/*
 // @match        https://danbooru.donmai.us/*
 // @match        https://www.danbooru.donmai.us/*
@@ -151,7 +151,6 @@
     // Progress bar initialization
     function initializeProgressBar() {
         if (!progressContainer) {
-            // Create the progress container
             progressContainer = document.createElement('div');
             progressContainer.style.position = 'fixed';
             progressContainer.style.bottom = '10px';
@@ -164,14 +163,12 @@
             progressContainer.style.zIndex = 1000;
             progressContainer.style.display = 'block';
 
-            // Create the progress bar
             progressBar = document.createElement('div');
             progressBar.style.height = '100%';
             progressBar.style.width = '0%';
             progressBar.style.backgroundColor = '#4CAF50';
             progressBar.style.transition = 'width 0.3s ease';
 
-            // Create the percentage display
             percentageDisplay = document.createElement('div');
             percentageDisplay.style.position = 'fixed';
             percentageDisplay.style.bottom = '35px';
@@ -235,7 +232,7 @@
         button.innerText = 'Download Media';
         button.style.position = 'fixed';
         button.style.top = '10px';
-        button.style.left = '10px';
+        button.style.right = '10px'; // Changed to position button in the top-right
         button.style.zIndex = 1000;
         button.style.backgroundColor = '#4CAF50';
         button.style.color = 'white';
