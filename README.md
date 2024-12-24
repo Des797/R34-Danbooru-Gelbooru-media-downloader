@@ -27,7 +27,8 @@ The user is solely responsible for complying with the terms of service of the we
 5. A progress bar will display the download progress, and a completion alert will show the total number of successful and failed downloads.
 
 ## Limitations
-- Some websites may throttle or block automated downloads if abused. Use responsibly
+- Some websites may throttle or block automated downloads if abused, use responsibly.
+- Chrome downloads but I recommend using Firefox.
 
 ## Contributing
 Contributions are welcome! Feel free to submit issues or pull requests on the GitHub repository.
