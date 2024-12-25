@@ -7,6 +7,8 @@
 // @match        https://rule34.xxx/*
 // @match        https://danbooru.donmai.us/*
 // @match        https://www.danbooru.donmai.us/*
+// @downloadURL  https://raw.githubusercontent.com/shadybrady101/R34-Danbooru-media-downloader/refs/heads/main/Downloader%20Script.js
+// @updateURL    https://raw.githubusercontent.com/shadybrady101/R34-Danbooru-media-downloader/refs/heads/main/Downloader%20Script.js
 // @grant        GM_download
 // ==/UserScript==
 
