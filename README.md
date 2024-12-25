@@ -29,6 +29,7 @@ The user is solely responsible for complying with the terms of service of the we
 ## Limitations
 - Some websites may throttle or block automated downloads if abused, use responsibly.
 - Chrome downloads(does not save in a made folder), I recommend using Firefox.
+- You will get rate limited with about 5+ tags until a set a limit but that will make it slow.
 
 ## Contributing
 Contributions are welcome! Feel free to submit issues or pull requests on the GitHub repository.
