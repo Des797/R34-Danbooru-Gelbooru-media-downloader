@@ -2,7 +2,7 @@
 // @name         Multi-Site Media Downloader
 // @namespace    http://tampermonkey.net/
 // @version      1.0
-// @description  Download images and videos from tags on Rule34 and Danbooru with alert only after all downloads are complete
+// @description  Download images and videos from tags on Rule34 and Danbooru
 // @author       shadybrady
 // @match        https://rule34.xxx/*
 // @match        https://danbooru.donmai.us/*
