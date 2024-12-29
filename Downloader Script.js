@@ -1,16 +1,17 @@
 // ==UserScript==
 // @name         Multi-Site Media Downloader
 // @namespace    http://tampermonkey.net/
-// @version      2.0
+// @version      2.1
 // @description  Download images and videos from tags on Rule34, Gelbooru, and Danbooru
 // @author       shadybrady
 // @match        https://rule34.xxx/*
 // @match        https://danbooru.donmai.us/*
 // @match        https://gelbooru.com/*
-// @downloadURL  https://raw.githubusercontent.com/shadybrady101/R34-Danbooru-media-downloader/refs/heads/main/Downloader%20Script.js
-// @updateURL    https://raw.githubusercontent.com/shadybrady101/R34-Danbooru-media-downloader/refs/heads/main/Downloader%20Script.js
+// @downloadURL  https://raw.githubusercontent.com/shadybrady101/R34-Danbooru-media-downloader/main/Downloader%20Script.js
+// @updateURL    https://raw.githubusercontent.com/shadybrady101/R34-Danbooru-media-downloader/main/Downloader%20Script.js
 // @grant        GM_xmlhttpRequest
 // @grant        GM_download
+// @license      MIT
 // ==/UserScript==
 
 (function () {
@@ -21,12 +22,17 @@
     let totalMedia = 0;
     let downloadedMedia = 0;
     let failedDownloads = 0;
+    let skippedMedia = 0;
     let progressContainer;
     let stopRequested = false;
+    const abortControllers = []; // Tracks abort controllers for ongoing fetches
 
     const UI_WIDTH = '260px';
+    const downloadedMediaSet = new Set(
+        JSON.parse(localStorage.getItem('downloadedMedia') || '[]')
+    );
+    const inProgressDownloads = new Set(); // Tracks currently downloading files
 
-    // Create the main UI container
     function createUIContainer() {
         const container = document.createElement('div');
         container.style.cssText = `
@@ -46,12 +52,11 @@
         `;
         container.id = 'multiSiteDownloaderUI';
 
-        // Add buttons and progress container
         const buttonContainer = document.createElement('div');
-        buttonContainer.style.cssText = 'display: flex; gap: 6px; margin-bottom: 8px;';
+        buttonContainer.style.cssText = 'display: flex; gap: 6px; margin-bottom: 8px; flex-wrap: wrap;';
 
         const downloadButton = document.createElement('button');
-        downloadButton.innerText = 'Download';
+        downloadButton.innerText = 'Download/Resume';
         downloadButton.style.cssText = getButtonStyles('#4CAF50');
         downloadButton.addEventListener('click', () => {
             const tags = prompt('Enter tags for mass download (separated by spaces):');
@@ -65,12 +70,27 @@
         stopButton.innerText = 'Stop';
         stopButton.style.cssText = getButtonStyles('#F44336');
         stopButton.addEventListener('click', () => {
-            stopRequested = true;
-            alert('Stopping download... Please wait for current processes to finish.');
+            if (confirm('Stop all processes?')) {
+                stopRequested = true;
+                abortControllers.forEach(controller => controller.abort()); // Abort all ongoing fetches
+                alert('Stopping downloads. This may take a moment.');
+            }
+        });
+
+        const resetButton = document.createElement('button');
+        resetButton.innerText = 'Reset Skipped';
+        resetButton.style.cssText = getButtonStyles('#FFC107');
+        resetButton.addEventListener('click', () => {
+            if (confirm('Are you sure you want to reset skipped tracking?')) {
+                downloadedMediaSet.clear();
+                localStorage.setItem('downloadedMedia', JSON.stringify([...downloadedMediaSet]));
+                alert('Skipped tracking has been reset.');
+            }
         });
 
         buttonContainer.appendChild(downloadButton);
         buttonContainer.appendChild(stopButton);
+        buttonContainer.appendChild(resetButton);
         container.appendChild(buttonContainer);
 
         progressContainer = document.createElement('div');
@@ -84,14 +104,14 @@
         progressContainer.innerHTML = `
             <strong>Progress:</strong> 0%<br>
             <strong>Downloaded:</strong> 0<br>
-            <strong>Failed:</strong> 0
+            <strong>Failed:</strong> 0<br>
+            <strong>Skipped:</strong> 0
         `;
 
         container.appendChild(progressContainer);
         document.body.appendChild(container);
     }
 
-    // Generate button styles
     function getButtonStyles(color) {
         return `
             flex: 1;
@@ -106,32 +126,35 @@
         `;
     }
 
-    // Update the progress display
     function updateProgress() {
-        const percentage = totalMedia > 0 ? Math.floor(((downloadedMedia + failedDownloads) / totalMedia) * 100) : 0;
+        const percentage = totalMedia > 0 ? Math.floor(((downloadedMedia + failedDownloads + skippedMedia) / totalMedia) * 100) : 0;
         progressContainer.innerHTML = `
             <strong>Progress:</strong> ${percentage}%<br>
             <strong>Downloaded:</strong> ${downloadedMedia}<br>
-            <strong>Failed:</strong> ${failedDownloads}
+            <strong>Failed:</strong> ${failedDownloads}<br>
+            <strong>Skipped:</strong> ${skippedMedia}
         `;
     }
 
-    // Start mass download process
     async function startMassDownload(tags) {
         totalMedia = 0;
         downloadedMedia = 0;
         failedDownloads = 0;
+        skippedMedia = 0;
 
         let page = 0;
         let continueFetching = true;
 
         while (continueFetching && !stopRequested) {
+            const controller = new AbortController(); // Create an abort controller
+            abortControllers.push(controller);
+
             const url = generateSearchUrl(tags, page);
             console.log(`Fetching: ${url}`);
 
-            const response = await fetchWithRetry(url);
-            if (!response || response.length === 0) {
-                console.warn('No more posts found.');
+            const response = await fetchWithRetry(url, controller.signal);
+            if (!response || response.length === 0 || stopRequested) {
+                console.warn('No more posts found or stopped.');
                 break;
             }
 
@@ -142,8 +165,13 @@
                 if (stopRequested) break;
 
                 if (post.file_url) {
-                    const folderName = `downloads/${tags.replace(/ /g, '_')}`;
-                    downloadMedia(post.file_url, folderName, `post_${post.id}`);
+                    if (!downloadedMediaSet.has(post.file_url) && !inProgressDownloads.has(post.file_url)) {
+                        const folderName = `downloads/${tags.replace(/ /g, '_')}`;
+                        downloadMedia(post.file_url, folderName, `post_${post.id}`);
+                    } else {
+                        skippedMedia++;
+                        updateProgress();
+                    }
                 } else {
                     console.warn(`Post ${post.id} has no file_url`);
                     failedDownloads++;
@@ -162,7 +190,6 @@
         }
     }
 
-    // Generate search URL
     function generateSearchUrl(tags, page) {
         if (window.location.hostname.includes('rule34.xxx')) {
             return `https://rule34.xxx/index.php?page=dapi&s=post&q=index&json=1&tags=${encodeURIComponent(tags)}&limit=${MAX_PER_PAGE}&pid=${page}`;
@@ -174,7 +201,6 @@
         throw new Error('Unsupported site');
     }
 
-    // Parse posts from API response
     function parsePosts(response) {
         if (Array.isArray(response)) {
             return response.map(post => ({
@@ -187,8 +213,7 @@
         return [];
     }
 
-    // Fetch data with retry mechanism
-    async function fetchWithRetry(url, retries = 3) {
+    async function fetchWithRetry(url, signal, retries = 3) {
         try {
             const response = await new Promise((resolve, reject) => {
                 GM_xmlhttpRequest({
@@ -196,13 +221,14 @@
                     url: url,
                     onload: (res) => resolve(JSON.parse(res.responseText)),
                     onerror: (err) => reject(err),
+                    signal, // Attach abort signal
                 });
             });
             return response;
         } catch (error) {
-            if (retries > 0) {
+            if (retries > 0 && !stopRequested) {
                 console.warn(`Retrying... (${retries} attempts left)`);
-                return fetchWithRetry(url, retries - 1);
+                return fetchWithRetry(url, signal, retries - 1);
             } else {
                 console.error('Failed to fetch:', error);
                 return null;
@@ -210,10 +236,14 @@
         }
     }
 
-    // Download media
     function downloadMedia(url, folderName, baseFileName) {
-        const fileExt = url.split('.').pop().split('?')[0];
+        let fileExt = url.split('.').pop().split('?')[0];
+        if (!fileExt.match(/^(jpg|jpeg|png|gif|webm|mp4)$/i)) {
+            fileExt = 'jpg'; // Default to .jpg for unknown extensions
+        }
+
         const fileName = `${folderName}/${baseFileName}.${fileExt}`;
+        inProgressDownloads.add(url);
 
         GM_download({
             url: url,
@@ -221,35 +251,37 @@
             onload: () => {
                 console.log(`Downloaded: ${fileName}`);
                 downloadedMedia++;
+                downloadedMediaSet.add(url);
+                inProgressDownloads.delete(url);
+                localStorage.setItem('downloadedMedia', JSON.stringify([...downloadedMediaSet]));
                 updateProgress();
             },
             onerror: (err) => {
                 console.error(`Failed to download: ${url}`, err);
                 failedDownloads++;
+                inProgressDownloads.delete(url);
                 updateProgress();
             },
         });
     }
 
-    // Check if all downloads are complete
     function checkCompletion() {
         const interval = setInterval(() => {
-            if (downloadedMedia + failedDownloads === totalMedia) {
+            if (downloadedMedia + failedDownloads + skippedMedia === totalMedia) {
                 clearInterval(interval);
                 setTimeout(() => {
                     progressContainer.innerHTML += '<br><strong>Download Complete!</strong>';
                     alert(
-                        `Mass download complete!\nSuccessful: ${downloadedMedia}\nFailed: ${failedDownloads}\nTotal: ${totalMedia}`
+                        `Mass download complete!\nSuccessful: ${downloadedMedia}\nFailed: ${failedDownloads}\nSkipped: ${skippedMedia}\nTotal: ${totalMedia}`
                     );
                 }, 500);
             }
         }, 500);
     }
 
-    // Initialize script
     window.addEventListener('load', () => {
         createUIContainer();
     });
 
-    console.log('Multi-Site Media Downloader with Compact UI is active. Use the buttons to start or stop downloads.');
+    console.log('Multi-Site Media Downloader with Enhanced Stop Functionality is active.');
 })();
