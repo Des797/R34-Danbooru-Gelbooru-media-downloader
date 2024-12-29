@@ -7,7 +7,7 @@ The **Multi-Site Media Downloader** is a Tampermonkey userscript that allows use
 - Supports downloading media from Rule34, Gelbooru, and Danbooru.
 - Downloading by tags.
 - Progress bar to track download progress.
-- Alerts users when downloads are complete.
+- Saves locally and will never repeat downloads unless you reset it.
 
 ## Disclaimer
 The user is solely responsible for complying with the terms of service of the websites they interact with and ensuring they have permission to download any content.
@@ -27,6 +27,7 @@ The user is solely responsible for complying with the terms of service of the we
 5. A progress bar will display the download progress, and a completion alert will show the total number of successful and failed downloads.
 
 ## Limitations
+- Downloading over 1000 I highly reccomend just closing out your browser.
 - Some websites may throttle or block automated downloads if abused, use responsibly.
 - Chrome downloads(does not save in a made folder), I recommend using Firefox.
 - Tag limits, Rule34(15), Gelbooru(10), Danbooru(2 unless premium user),
