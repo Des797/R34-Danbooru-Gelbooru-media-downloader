@@ -1,10 +1,10 @@
 # Media Downloader
 
 ## Overview
-The **Multi-Site Media Downloader** is a Tampermonkey userscript that allows users to download images and videos from **Rule34** and **Danbooru** using specific tags. It features a progress bar and provides a completion alert once all downloads are done.
+The **Multi-Site Media Downloader** is a Tampermonkey userscript that allows users to download images and videos from **Rule34**, **Gelbooru**, **Danbooru** using specific tags.
 
 ## Features
-- Supports downloading media from Rule34 and Danbooru.
+- Supports downloading media from Rule34, Gelbooru, and Danbooru.
 - Downloading by tags.
 - Progress bar to track download progress.
 - Alerts users when downloads are complete.
@@ -20,8 +20,8 @@ The user is solely responsible for complying with the terms of service of the we
    - Save the script.
 
 ## Usage
-1. Visit Rule34 or Danbooru.
-2. Use the **"Download Media"** button located at the top-right of the page.
+1. Visit Rule34, Gelbooru, Danbooru.
+2. Use the **"Download"** button located at the top-right of the page.
 3. Enter tags to search for specific media (e.g., `cute_girl`).
 4. The script will fetch and download media files matching your tags.
 5. A progress bar will display the download progress, and a completion alert will show the total number of successful and failed downloads.
@@ -29,7 +29,7 @@ The user is solely responsible for complying with the terms of service of the we
 ## Limitations
 - Some websites may throttle or block automated downloads if abused, use responsibly.
 - Chrome downloads(does not save in a made folder), I recommend using Firefox.
-- You are limited to 8 tags other wise you will get rate limited.
+- Tag limits, Rule34(15), Gelbooru(10), Danbooru(2 unless premium user),
 
 ## Contributing
 Contributions are welcome! Feel free to submit issues or pull requests on the GitHub repository.
