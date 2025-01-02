@@ -5,7 +5,7 @@ The **Multi-Site Media Downloader** is a Tampermonkey userscript that allows use
 
 ## Features
 - Supports downloading media from Rule34, Gelbooru, and Danbooru.
-- Downloading by tags.
+- Downloading by tags and by score.
 - Progress bar to track download progress.
 - Saves locally and will never repeat downloads unless you reset it.
 
