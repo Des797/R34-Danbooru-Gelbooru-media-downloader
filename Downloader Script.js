@@ -18,7 +18,7 @@
     'use strict';
 
     const MAX_PER_PAGE = 100;
-    const BATCH_SIZE = 1000; // Number of entries to keep in memory before saving to localStorage
+    const BATCH_SIZE = 500; // Number of entries to save in a single batch
     const LOCAL_STORAGE_KEY = 'downloadedMedia';
 
     let totalMedia = 0;
@@ -27,12 +27,12 @@
     let skippedMedia = 0;
     let progressContainer;
     let stopRequested = false;
-    const abortControllers = []; // Tracks abort controllers for ongoing fetches
 
     const downloadedMediaSet = new Set(
         JSON.parse(localStorage.getItem(LOCAL_STORAGE_KEY) || '[]')
     );
     const inProgressDownloads = new Set(); // Tracks currently downloading files
+    const newlySkippedSet = new Set(); // Temporarily tracks newly skipped files
 
     function createUIContainer() {
         const container = document.createElement('div');
@@ -56,7 +56,7 @@
         buttonContainer.style.cssText = 'display: flex; gap: 6px; margin-bottom: 8px; flex-wrap: wrap;';
 
         const downloadButton = document.createElement('button');
-        downloadButton.innerText = 'Download by Score';
+        downloadButton.innerText = 'Download';
         downloadButton.style.cssText = getButtonStyles('#4CAF50');
         downloadButton.addEventListener('click', () => {
             const tags = prompt('Enter tags for mass download (separated by spaces):');
@@ -73,7 +73,6 @@
         stopButton.addEventListener('click', () => {
             if (confirm('Stop all processes?')) {
                 stopRequested = true;
-                abortControllers.forEach(controller => controller.abort());
                 alert('Stopping downloads. This may take a moment.');
             }
         });
@@ -147,13 +146,10 @@
         let continueFetching = true;
 
         while (continueFetching && !stopRequested) {
-            const controller = new AbortController();
-            abortControllers.push(controller);
-
             const url = generateSearchUrl(tags, page);
             console.log(`Fetching: ${url}`);
 
-            const response = await fetchWithRetry(url, controller.signal);
+            const response = await fetchWithRetry(url);
             if (!response || response.length === 0 || stopRequested) {
                 console.warn('No more posts found or stopped.');
                 break;
@@ -174,6 +170,7 @@
                         downloadMedia(post.file_url, fileName);
                     } else {
                         skippedMedia++;
+                        newlySkippedSet.add(post.file_url); // Track newly skipped files
                         updateProgress();
                     }
                 } else {
@@ -186,8 +183,8 @@
             continueFetching = posts.length === MAX_PER_PAGE;
             page++;
 
-            if (downloadedMediaSet.size >= BATCH_SIZE) {
-                saveDownloadedMedia();
+            if (newlySkippedSet.size >= BATCH_SIZE) {
+                saveSkippedMedia();
             }
         }
 
@@ -198,9 +195,11 @@
         }
     }
 
-    function saveDownloadedMedia() {
+    function saveSkippedMedia() {
+        newlySkippedSet.forEach(url => downloadedMediaSet.add(url));
         localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify([...downloadedMediaSet]));
-        console.log('Saved downloaded media to localStorage.');
+        newlySkippedSet.clear();
+        console.log('Saved skipped media to localStorage.');
     }
 
     function generateSearchUrl(tags, page) {
@@ -227,7 +226,7 @@
         return [];
     }
 
-    async function fetchWithRetry(url, signal, retries = 3) {
+    async function fetchWithRetry(url, retries = 3) {
         try {
             const response = await new Promise((resolve, reject) => {
                 GM_xmlhttpRequest({
@@ -235,14 +234,13 @@
                     url: url,
                     onload: (res) => resolve(JSON.parse(res.responseText)),
                     onerror: (err) => reject(err),
-                    signal,
                 });
             });
             return response;
         } catch (error) {
             if (retries > 0 && !stopRequested) {
                 console.warn(`Retrying... (${retries} attempts left)`);
-                return fetchWithRetry(url, signal, retries - 1);
+                return fetchWithRetry(url, retries - 1);
             } else {
                 console.error('Failed to fetch:', error);
                 return null;
@@ -279,16 +277,14 @@
     }
 
     function checkCompletion() {
+        saveSkippedMedia();
         const interval = setInterval(() => {
             if (downloadedMedia + failedDownloads + skippedMedia === totalMedia) {
                 clearInterval(interval);
-                setTimeout(() => {
-                    saveDownloadedMedia();
-                    progressContainer.innerHTML += '<br><strong>Download Complete!</strong>';
-                    alert(
-                        `Mass download complete!\nSuccessful: ${downloadedMedia}\nFailed: ${failedDownloads}\nSkipped: ${skippedMedia}\nTotal: ${totalMedia}`
-                    );
-                }, 500);
+                progressContainer.innerHTML += '<br><strong>Download Complete!</strong>';
+                alert(
+                    `Mass download complete!\nSuccessful: ${downloadedMedia}\nFailed: ${failedDownloads}\nSkipped: ${skippedMedia}\nTotal: ${totalMedia}`
+                );
             }
         }, 500);
     }
@@ -297,5 +293,5 @@
         createUIContainer();
     });
 
-    console.log('Optimized Multi-Site Media Downloader is active.');
+    console.log('Optimized Media Downloader with Download Button Text Updated is active.');
 })();
