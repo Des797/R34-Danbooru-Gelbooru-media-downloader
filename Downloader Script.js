@@ -18,6 +18,8 @@
     'use strict';
 
     const MAX_PER_PAGE = 100;
+    const BATCH_SIZE = 1000; // Number of entries to keep in memory before saving to localStorage
+    const LOCAL_STORAGE_KEY = 'downloadedMedia';
 
     let totalMedia = 0;
     let downloadedMedia = 0;
@@ -27,9 +29,8 @@
     let stopRequested = false;
     const abortControllers = []; // Tracks abort controllers for ongoing fetches
 
-    const UI_WIDTH = '260px';
     const downloadedMediaSet = new Set(
-        JSON.parse(localStorage.getItem('downloadedMedia') || '[]')
+        JSON.parse(localStorage.getItem(LOCAL_STORAGE_KEY) || '[]')
     );
     const inProgressDownloads = new Set(); // Tracks currently downloading files
 
@@ -45,24 +46,24 @@
             color: #f0f0f0;
             border: 1px solid #555;
             border-radius: 6px;
-            width: ${UI_WIDTH};
+            width: 260px;
             box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
             font-family: Arial, sans-serif;
             font-size: 13px;
         `;
-        container.id = 'multiSiteDownloaderUI';
 
         const buttonContainer = document.createElement('div');
         buttonContainer.style.cssText = 'display: flex; gap: 6px; margin-bottom: 8px; flex-wrap: wrap;';
 
         const downloadButton = document.createElement('button');
-        downloadButton.innerText = 'Download/Resume';
+        downloadButton.innerText = 'Download by Score';
         downloadButton.style.cssText = getButtonStyles('#4CAF50');
         downloadButton.addEventListener('click', () => {
             const tags = prompt('Enter tags for mass download (separated by spaces):');
-            if (tags) {
+            const scoreThreshold = parseInt(prompt('Enter the minimum score for downloads:'), 10);
+            if (tags && !isNaN(scoreThreshold)) {
                 stopRequested = false;
-                startMassDownload(tags.trim());
+                startMassDownload(tags.trim(), scoreThreshold);
             }
         });
 
@@ -72,7 +73,7 @@
         stopButton.addEventListener('click', () => {
             if (confirm('Stop all processes?')) {
                 stopRequested = true;
-                abortControllers.forEach(controller => controller.abort()); // Abort all ongoing fetches
+                abortControllers.forEach(controller => controller.abort());
                 alert('Stopping downloads. This may take a moment.');
             }
         });
@@ -83,7 +84,7 @@
         resetButton.addEventListener('click', () => {
             if (confirm('Are you sure you want to reset skipped tracking?')) {
                 downloadedMediaSet.clear();
-                localStorage.setItem('downloadedMedia', JSON.stringify([...downloadedMediaSet]));
+                localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify([...downloadedMediaSet]));
                 alert('Skipped tracking has been reset.');
             }
         });
@@ -91,7 +92,6 @@
         buttonContainer.appendChild(downloadButton);
         buttonContainer.appendChild(stopButton);
         buttonContainer.appendChild(resetButton);
-        container.appendChild(buttonContainer);
 
         progressContainer = document.createElement('div');
         progressContainer.style.cssText = `
@@ -108,6 +108,7 @@
             <strong>Skipped:</strong> 0
         `;
 
+        container.appendChild(buttonContainer);
         container.appendChild(progressContainer);
         document.body.appendChild(container);
     }
@@ -136,7 +137,7 @@
         `;
     }
 
-    async function startMassDownload(tags) {
+    async function startMassDownload(tags, scoreThreshold) {
         totalMedia = 0;
         downloadedMedia = 0;
         failedDownloads = 0;
@@ -146,7 +147,7 @@
         let continueFetching = true;
 
         while (continueFetching && !stopRequested) {
-            const controller = new AbortController(); // Create an abort controller
+            const controller = new AbortController();
             abortControllers.push(controller);
 
             const url = generateSearchUrl(tags, page);
@@ -159,15 +160,18 @@
             }
 
             const posts = parsePosts(response);
-            totalMedia += posts.length;
 
-            for (const post of posts) {
+            const filteredPosts = posts.filter(post => (post.score || 0) >= scoreThreshold);
+
+            totalMedia += filteredPosts.length;
+
+            for (const post of filteredPosts) {
                 if (stopRequested) break;
 
                 if (post.file_url) {
                     if (!downloadedMediaSet.has(post.file_url) && !inProgressDownloads.has(post.file_url)) {
-                        const folderName = `downloads/${tags.replace(/ /g, '_')}`;
-                        downloadMedia(post.file_url, folderName, `post_${post.id}`);
+                        const fileName = `post_${post.id}`;
+                        downloadMedia(post.file_url, fileName);
                     } else {
                         skippedMedia++;
                         updateProgress();
@@ -181,6 +185,10 @@
 
             continueFetching = posts.length === MAX_PER_PAGE;
             page++;
+
+            if (downloadedMediaSet.size >= BATCH_SIZE) {
+                saveDownloadedMedia();
+            }
         }
 
         if (stopRequested) {
@@ -188,6 +196,11 @@
         } else {
             checkCompletion();
         }
+    }
+
+    function saveDownloadedMedia() {
+        localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify([...downloadedMediaSet]));
+        console.log('Saved downloaded media to localStorage.');
     }
 
     function generateSearchUrl(tags, page) {
@@ -205,7 +218,8 @@
         if (Array.isArray(response)) {
             return response.map(post => ({
                 id: post.id,
-                file_url: post.file_url || post.large_file_url || post.preview_file_url
+                file_url: post.file_url || post.large_file_url || post.preview_file_url,
+                score: post.score || 0,
             }));
         } else if (response.post) {
             return Array.isArray(response.post) ? response.post : [response.post];
@@ -221,7 +235,7 @@
                     url: url,
                     onload: (res) => resolve(JSON.parse(res.responseText)),
                     onerror: (err) => reject(err),
-                    signal, // Attach abort signal
+                    signal,
                 });
             });
             return response;
@@ -236,13 +250,13 @@
         }
     }
 
-    function downloadMedia(url, folderName, baseFileName) {
+    function downloadMedia(url, baseFileName) {
         let fileExt = url.split('.').pop().split('?')[0];
         if (!fileExt.match(/^(jpg|jpeg|png|gif|webm|mp4)$/i)) {
-            fileExt = 'jpg'; // Default to .jpg for unknown extensions
+            fileExt = 'jpg';
         }
 
-        const fileName = `${folderName}/${baseFileName}.${fileExt}`;
+        const fileName = `${baseFileName}.${fileExt}`;
         inProgressDownloads.add(url);
 
         GM_download({
@@ -253,7 +267,6 @@
                 downloadedMedia++;
                 downloadedMediaSet.add(url);
                 inProgressDownloads.delete(url);
-                localStorage.setItem('downloadedMedia', JSON.stringify([...downloadedMediaSet]));
                 updateProgress();
             },
             onerror: (err) => {
@@ -270,6 +283,7 @@
             if (downloadedMedia + failedDownloads + skippedMedia === totalMedia) {
                 clearInterval(interval);
                 setTimeout(() => {
+                    saveDownloadedMedia();
                     progressContainer.innerHTML += '<br><strong>Download Complete!</strong>';
                     alert(
                         `Mass download complete!\nSuccessful: ${downloadedMedia}\nFailed: ${failedDownloads}\nSkipped: ${skippedMedia}\nTotal: ${totalMedia}`
@@ -283,5 +297,5 @@
         createUIContainer();
     });
 
-    console.log('Multi-Site Media Downloader with Enhanced Stop Functionality is active.');
+    console.log('Optimized Multi-Site Media Downloader is active.');
 })();
