@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Multi-Site Media Downloader
 // @namespace    http://tampermonkey.net/
-// @version      2.1
+// @version      2.2
 // @description  Download images and videos from tags on Rule34, Gelbooru, and Danbooru
 // @author       shadybrady
 // @match        https://rule34.xxx/*
@@ -17,9 +17,12 @@
 (function () {
     'use strict';
 
+    console.log('Script activated on:', window.location.hostname);
+
     const MAX_PER_PAGE = 100;
     const BATCH_SIZE = 500; // Number of entries to save in a single batch
     const LOCAL_STORAGE_KEY = 'downloadedMedia';
+    const MAX_API_RETRIES = 3;
 
     let totalMedia = 0;
     let downloadedMedia = 0;
@@ -31,8 +34,8 @@
     const downloadedMediaSet = new Set(
         JSON.parse(localStorage.getItem(LOCAL_STORAGE_KEY) || '[]')
     );
-    const inProgressDownloads = new Set(); // Tracks currently downloading files
-    const newlySkippedSet = new Set(); // Temporarily tracks newly skipped files
+    const inProgressDownloads = new Set();
+    const newlySkippedSet = new Set();
 
     function createUIContainer() {
         const container = document.createElement('div');
@@ -150,6 +153,8 @@
             console.log(`Fetching: ${url}`);
 
             const response = await fetchWithRetry(url);
+            console.log(response);
+
             if (!response || response.length === 0 || stopRequested) {
                 console.warn('No more posts found or stopped.');
                 break;
@@ -170,7 +175,7 @@
                         downloadMedia(post.file_url, fileName);
                     } else {
                         skippedMedia++;
-                        newlySkippedSet.add(post.file_url); // Track newly skipped files
+                        newlySkippedSet.add(post.file_url);
                         updateProgress();
                     }
                 } else {
@@ -226,32 +231,39 @@
         return [];
     }
 
-    async function fetchWithRetry(url, retries = 3) {
-        try {
-            const response = await new Promise((resolve, reject) => {
-                GM_xmlhttpRequest({
-                    method: 'GET',
-                    url: url,
-                    onload: (res) => resolve(JSON.parse(res.responseText)),
-                    onerror: (err) => reject(err),
-                });
+    async function fetchWithRetry(url, retries = MAX_API_RETRIES) {
+        return new Promise((resolve, reject) => {
+            GM_xmlhttpRequest({
+                method: 'GET',
+                url: url,
+                onload: function (response) {
+                    if (response.status === 200) {
+                        resolve(JSON.parse(response.responseText));
+                    } else {
+                        handleRetry(retries, reject, url);
+                    }
+                },
+                onerror: function () {
+                    handleRetry(retries, reject, url);
+                }
             });
-            return response;
-        } catch (error) {
-            if (retries > 0 && !stopRequested) {
-                console.warn(`Retrying... (${retries} attempts left)`);
-                return fetchWithRetry(url, retries - 1);
-            } else {
-                console.error('Failed to fetch:', error);
-                return null;
-            }
+        });
+    }
+
+    function handleRetry(retries, reject, url) {
+        if (retries > 0 && !stopRequested) {
+            console.warn(`Retrying... (${retries} attempts left)`);
+            fetchWithRetry(url, retries - 1).then(resolve).catch(reject);
+        } else {
+            console.error('Failed to fetch:', url);
+            reject('Failed after retrying');
         }
     }
 
     function downloadMedia(url, baseFileName) {
         let fileExt = url.split('.').pop().split('?')[0];
         if (!fileExt.match(/^(jpg|jpeg|png|gif|webm|mp4)$/i)) {
-            fileExt = 'jpg';
+            fileExt = 'jpg'; // Default to 'jpg' if the extension is not recognized
         }
 
         const fileName = `${baseFileName}.${fileExt}`;
@@ -293,5 +305,5 @@
         createUIContainer();
     });
 
-    console.log('Optimized Media Downloader with Download Button Text Updated is active.');
+    console.log('Multi-Site Media Downloader is active.');
 })();
