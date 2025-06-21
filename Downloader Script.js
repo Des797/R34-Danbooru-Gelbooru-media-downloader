@@ -22,6 +22,8 @@
     const MAX_PER_PAGE = 100;
     const BATCH_SIZE = 500; // Number of entries to save in a single batch
     const LOCAL_STORAGE_KEY = 'downloadedMedia';
+    const TAGS_KEY = 'lastUsedTags';
+    const SCORE_KEY = 'lastUsedScore';
     const MAX_API_RETRIES = 3;
 
     let totalMedia = 0;
@@ -68,10 +70,20 @@
         tagInput.placeholder = 'Enter tags...';
         tagInput.style.cssText = 'width: 100%; padding: 4px; font-size: 13px; margin-bottom: 4px;';
 
+        const lastUsedTags = localStorage.getItem(TAGS_KEY);
+        if (lastUsedTags) {
+            tagInput.value = lastUsedTags;
+        }
+
         const scoreInput = document.createElement('input');
         scoreInput.type = 'number';
-        scoreInput.placeholder = 'Min score - 0';
+        scoreInput.placeholder = 'Min score - Default 0';
         scoreInput.style.cssText = 'width: 100%; padding: 4px; font-size: 13px; margin-bottom: 4px;';
+
+        const lastUsedScore = localStorage.getItem(SCORE_KEY);
+        if (lastUsedScore) {
+            scoreInput.value = lastUsedScore;
+        }
 
         const downloadButton = document.createElement('button');
         downloadButton.innerText = 'Download';
@@ -82,6 +94,9 @@
             if (tags) {
                 stopRequested = false;
                 startMassDownload(tags, score);
+
+                localStorage.setItem(TAGS_KEY, tags);
+                localStorage.setItem(SCORE_KEY, score.toString());
             } else {
                 alert('Please enter at least one tag.');
             }
