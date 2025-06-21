@@ -262,7 +262,7 @@
 
     function downloadMedia(url, baseFileName) {
         let fileExt = url.split('.').pop().split('?')[0];
-        if (!fileExt.match(/^(jpg|jpeg|png|gif|webm|mp4)$/i)) {
+        if (!fileExt.match(/^(jpg|jpeg|png|gif|webm|mp4|avi|mpg|mpeg)$/i)) {
             fileExt = 'jpg'; // Default to 'jpg' if the extension is not recognized
         }
 
