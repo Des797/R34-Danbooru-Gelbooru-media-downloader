@@ -37,6 +37,11 @@
     const inProgressDownloads = new Set();
     const newlySkippedSet = new Set();
 
+    const presetTags = [
+        { label: 'Videos', tags: '( video ~ vid ~ webm )' },
+        { label: 'No AI', tags: '-ai_generated -stable_diffusion -ai_created -aigenerated -ai-generated' },
+    ];
+
     function createUIContainer() {
         const container = document.createElement('div');
         container.style.cssText = `
@@ -58,15 +63,27 @@
         const buttonContainer = document.createElement('div');
         buttonContainer.style.cssText = 'display: flex; gap: 6px; margin-bottom: 8px; flex-wrap: wrap;';
 
+        const tagInput = document.createElement('input');
+        tagInput.type = 'text';
+        tagInput.placeholder = 'Enter tags...';
+        tagInput.style.cssText = 'width: 100%; padding: 4px; font-size: 13px; margin-bottom: 4px;';
+
+        const scoreInput = document.createElement('input');
+        scoreInput.type = 'number';
+        scoreInput.placeholder = 'Min score - 0';
+        scoreInput.style.cssText = 'width: 100%; padding: 4px; font-size: 13px; margin-bottom: 4px;';
+
         const downloadButton = document.createElement('button');
         downloadButton.innerText = 'Download';
         downloadButton.style.cssText = getButtonStyles('#4CAF50');
         downloadButton.addEventListener('click', () => {
-            const tags = prompt('Enter tags for mass download (separated by spaces):');
-            const scoreThreshold = parseInt(prompt('Enter the minimum score for downloads:'), 10);
-            if (tags && !isNaN(scoreThreshold)) {
+            const tags = tagInput.value.trim();
+            const score = parseInt(scoreInput.value, 10) || 0;
+            if (tags) {
                 stopRequested = false;
-                startMassDownload(tags.trim(), scoreThreshold);
+                startMassDownload(tags, score);
+            } else {
+                alert('Please enter at least one tag.');
             }
         });
 
@@ -91,6 +108,24 @@
             }
         });
 
+        const presetContainer = document.createElement('div');
+        presetContainer.style.cssText = 'display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 8px;';
+        presetTags.forEach(preset => {
+            const btn = document.createElement('button');
+            btn.innerText = preset.label;
+            btn.style.cssText = getButtonStyles('#2196F3') + 'flex: none; padding: 2px 6px;';
+            btn.addEventListener('click', () => {
+                const currentTags = tagInput.value.trim();
+                const newTags = preset.tags;
+                const mergedTags = currentTags ? `${currentTags} ${newTags}` : newTags;
+                tagInput.value = mergedTags.trim();
+            });
+            presetContainer.appendChild(btn);
+        });
+
+        container.appendChild(tagInput);
+        container.appendChild(scoreInput);
+        container.appendChild(presetContainer);
         buttonContainer.appendChild(downloadButton);
         buttonContainer.appendChild(stopButton);
         buttonContainer.appendChild(resetButton);
@@ -287,6 +322,7 @@
             },
         });
     }
+
 
     function checkCompletion() {
         saveSkippedMedia();
