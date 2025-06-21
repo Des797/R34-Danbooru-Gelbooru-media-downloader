@@ -221,7 +221,9 @@
 
                 if (post.file_url) {
                     if (!downloadedMediaSet.has(post.file_url) && !inProgressDownloads.has(post.file_url)) {
-                        const fileName = `post_${post.id}`;
+                        const firstTag = tags.trim().split(/\s+/)[0] || 'tag';
+                        const sanitizedTag = firstTag.replace(/[^\w\-]/g, '_');
+                        const fileName = `${sanitizedTag}_${post.id}`;
                         downloadMedia(post.file_url, fileName);
                     } else {
                         skippedMedia++;
